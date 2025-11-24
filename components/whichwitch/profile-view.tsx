@@ -5,14 +5,18 @@ import type { UserProfile } from "./app-container"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { WorkCard } from "./work-card"
-import { works } from "@/lib/mock-data"
 import { Settings, Share2, Wallet, ArrowUpRight } from "lucide-react"
 import { WorkDetailDialog } from "./work-card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 
-export function ProfileView({ user }: { user: UserProfile }) {
-  // In a real app, we'd filter works by user ID
-  const myWorks = works.slice(0, 2)
-  const myRemixes = works.slice(2, 4).map((w) => ({ ...w, isRemix: true }))
+export function ProfileView({ user, works }: { user: UserProfile; works: any[] }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const myWorks = works.filter((w) => !w.isRemix).slice(0, 6)
+  const myRemixes = works.filter((w) => w.isRemix || w.collectionStatus === "approved").slice(0, 4)
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -29,7 +33,7 @@ export function ProfileView({ user }: { user: UserProfile }) {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <h1 className="text-3xl font-bold tracking-tight">{user.name}</h1>
                   <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-mono border border-primary/20">
                     DID: {user.did.slice(0, 12)}...
@@ -51,10 +55,9 @@ export function ProfileView({ user }: { user: UserProfile }) {
               </div>
             </div>
 
-            {/* Right: Balance & Actions */}
-            <div className="w-full md:w-auto flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-6 bg-primary/5 rounded-xl p-4 min-w-[240px]">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 items-end">
+              <div className="flex items-center gap-4 bg-primary/5 rounded-xl p-4 min-w-[240px]">
+                <div className="flex items-center gap-3 flex-1">
                   <div className="p-2 bg-primary/10 rounded-full text-primary">
                     <Wallet className="w-5 h-5" />
                   </div>
@@ -63,13 +66,18 @@ export function ProfileView({ user }: { user: UserProfile }) {
                     <p className="text-xl font-mono font-bold">4.205 ETH</p>
                   </div>
                 </div>
-                <Button size="sm" className="gap-2 h-8">
+                <Button size="sm" className="gap-2 h-8 shrink-0">
                   <ArrowUpRight className="w-4 h-4" /> Withdraw
                 </Button>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" className="gap-2 bg-transparent h-8">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 bg-transparent h-8"
+                  onClick={() => setSettingsOpen(true)}
+                >
                   <Settings className="w-4 h-4" /> Settings
                 </Button>
                 <Button variant="outline" size="sm" className="gap-2 bg-transparent h-8">
@@ -104,6 +112,8 @@ export function ProfileView({ user }: { user: UserProfile }) {
           </div>
         </TabsContent>
       </Tabs>
+
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} user={user} />
     </div>
   )
 }
@@ -118,5 +128,91 @@ function WorkDetailTrigger({ work }: { work: any }) {
       </div>
       <WorkDetailDialog work={work} open={open} onOpenChange={setOpen} />
     </>
+  )
+}
+
+function SettingsModal({
+  open,
+  onOpenChange,
+  user,
+}: { open: boolean; onOpenChange: (open: boolean) => void; user: UserProfile }) {
+  const [formData, setFormData] = useState({
+    name: user.name,
+    bio: user.bio,
+    skills: user.skills,
+  })
+
+  const [skillInput, setSkillInput] = useState("")
+  const commonSkills = ["Ceramics", "Woodworking", "Digital Art", "Sculpture", "Weaving", "Metalwork"]
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md bg-background/95 backdrop-blur-xl border-primary/20">
+        <DialogHeader>
+          <DialogTitle>Edit Profile</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Display Name</Label>
+            <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Bio</Label>
+            <Textarea value={formData.bio} onChange={(e) => setFormData({ ...formData, bio: e.target.value })} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Skills</Label>
+            <div className="flex flex-wrap gap-2 p-3 border border-border rounded-lg bg-background min-h-[60px]">
+              {formData.skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-sm"
+                >
+                  {skill}
+                  <button
+                    onClick={() => setFormData({ ...formData, skills: formData.skills.filter((s) => s !== skill) })}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                placeholder="Press Enter to add"
+                className="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
+                value={skillInput}
+                onChange={(e) => setSkillInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && skillInput.trim()) {
+                    setFormData({ ...formData, skills: [...formData.skills, skillInput.trim()] })
+                    setSkillInput("")
+                  }
+                }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {commonSkills.map((skill) => (
+                <button
+                  key={skill}
+                  onClick={() => {
+                    if (!formData.skills.includes(skill)) {
+                      setFormData({ ...formData, skills: [...formData.skills, skill] })
+                    }
+                  }}
+                  className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                >
+                  + {skill}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Save Changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

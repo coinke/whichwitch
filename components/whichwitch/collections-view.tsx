@@ -15,9 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { GitFork, Wallet, Folder } from "lucide-react"
-import { UploadView } from "./upload-view"
-import type { UserProfile } from "./app-container"
+import { GitFork, Wallet, Folder, Upload } from "lucide-react"
 
 export function CollectionsView({
   works,
@@ -51,7 +49,11 @@ export function CollectionsView({
   })
 
   const handleRemixClick = (work: any) => {
+    if (!work.allowRemix) {
+      return // Button should be disabled, but just in case
+    }
     if (work.collectionStatus === "approved") {
+      setSelectedWork(work)
       setUploadModalOpen(true)
     } else {
       setSelectedWork(work)
@@ -181,7 +183,11 @@ export function CollectionsView({
       {/* Upload Modal */}
       <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
         <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-xl border-primary/20 max-h-[90vh] overflow-y-auto">
-          <UploadView user={{ did: "mock", name: "User", bio: "", skills: [] } as UserProfile} isRemix={true} />
+          <DialogHeader>
+            <DialogTitle>Upload Remix Work</DialogTitle>
+            <DialogDescription>Upload your remixed version of "{selectedWork?.title}"</DialogDescription>
+          </DialogHeader>
+          <UploadWorkForm onClose={() => setUploadModalOpen(false)} sourceWork={selectedWork} />
         </DialogContent>
       </Dialog>
     </div>
@@ -225,5 +231,146 @@ function NewFolderModal({ open, onOpenChange, onCreate }: any) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function UploadWorkForm({ onClose, sourceWork }: { onClose: () => void; sourceWork: any }) {
+  const [formData, setFormData] = useState({
+    title: "",
+    story: "",
+    material: [] as string[],
+    keywords: [] as string[],
+  })
+
+  const [materialInput, setMaterialInput] = useState("")
+  const [keywordInput, setKeywordInput] = useState("")
+
+  const commonMaterials = ["Clay", "Wood", "Metal", "Glass", "Fabric"]
+  const commonKeywords = ["abstract", "modern", "traditional", "digital", "organic"]
+
+  return (
+    <div className="space-y-6 py-4">
+      <div className="space-y-2">
+        <Label>Title</Label>
+        <Input
+          placeholder="Name your work"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Upload Images/Video</Label>
+        <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+          <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Story</Label>
+        <Textarea
+          placeholder="Tell the story behind your work"
+          value={formData.story}
+          onChange={(e) => setFormData({ ...formData, story: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Material</Label>
+        <div className="flex flex-wrap gap-2 p-3 border border-border rounded-lg bg-background min-h-[60px]">
+          {formData.material.map((mat) => (
+            <span
+              key={mat}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-sm"
+            >
+              {mat}
+              <button
+                onClick={() => setFormData({ ...formData, material: formData.material.filter((m) => m !== mat) })}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            type="text"
+            placeholder="Type and press Enter"
+            className="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
+            value={materialInput}
+            onChange={(e) => setMaterialInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && materialInput.trim()) {
+                setFormData({ ...formData, material: [...formData.material, materialInput.trim()] })
+                setMaterialInput("")
+              }
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {commonMaterials.map((mat) => (
+            <button
+              key={mat}
+              onClick={() => {
+                if (!formData.material.includes(mat)) {
+                  setFormData({ ...formData, material: [...formData.material, mat] })
+                }
+              }}
+              className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded-md transition-colors"
+            >
+              + {mat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Inspiration Keywords</Label>
+        <div className="flex flex-wrap gap-2 p-3 border border-border rounded-lg bg-background min-h-[60px]">
+          {formData.keywords.map((kw) => (
+            <span
+              key={kw}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-sm"
+            >
+              {kw}
+              <button onClick={() => setFormData({ ...formData, keywords: formData.keywords.filter((k) => k !== kw) })}>
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            type="text"
+            placeholder="Type and press Enter"
+            className="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && keywordInput.trim()) {
+                setFormData({ ...formData, keywords: [...formData.keywords, keywordInput.trim()] })
+                setKeywordInput("")
+              }
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {commonKeywords.map((kw) => (
+            <button
+              key={kw}
+              onClick={() => {
+                if (!formData.keywords.includes(kw)) {
+                  setFormData({ ...formData, keywords: [...formData.keywords, kw] })
+                }
+              }}
+              className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded-md transition-colors"
+            >
+              + {kw}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Button className="w-full" onClick={onClose}>
+        Upload & Mint
+      </Button>
+    </div>
   )
 }

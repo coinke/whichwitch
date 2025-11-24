@@ -1,12 +1,5 @@
 "use client"
 
-// 添加window.ethereum的类型定义
-declare global {
-  interface Window {
-    ethereum: any
-  }
-}
-
 import type React from "react"
 import Image from "next/image"
 import { useState } from "react"
@@ -14,10 +7,9 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Wallet, Sparkles, X, AlertCircle } from "lucide-react"
+import { Loader2, Wallet, Sparkles, X } from "lucide-react"
 import type { UserProfile } from "./app-container"
 import { Badge } from "@/components/ui/badge"
-import { ethers } from "ethers"
 
 export function AuthView({ onLogin }: { onLogin: (user: UserProfile) => void }) {
   const [step, setStep] = useState<"welcome" | "profile">("welcome")
@@ -31,149 +23,28 @@ export function AuthView({ onLogin }: { onLogin: (user: UserProfile) => void }) 
 
   const commonSkills = ["Ceramics", "Woodworking", "Digital Art", "Embroidery", "Pottery", "3D Modeling"]
 
-  const [error, setError] = useState<string | null>(null)
-
-  const handleConnect = async () => {
+  const handleConnect = () => {
     setLoading(true)
-    setError(null)
-    
-    try {
-      // 检查是否有window.ethereum对象
-      if (!window.ethereum) {
-        throw new Error("No wallet found. Please install MetaMask or another wallet provider.")
-      }
-      
-      // 创建provider
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      
-      // 请求用户连接钱包
-      const accounts = await provider.send("eth_requestAccounts", [])
-      
-      if (accounts.length === 0) {
-        throw new Error("No accounts found in wallet.")
-      }
-      
-      // 获取当前网络
-      const network = await provider.getNetwork()
-      console.log(`Connected to network: ${network.name} (${network.chainId})`)
-      
-      // 获取连接的钱包地址
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
-      const did = `did:whichwitch:${address}`
-      
-      // 检查数据库中是否已存在该用户
-      const response = await fetch(`/api/users?walletAddress=${address}`)
-      
-      let userProfile: UserProfile;
-      
-      if (response.ok) {
-        // 用户已存在，从数据库获取
-        const userData = await response.json();
-        userProfile = {
-          did: userData.did,
-          name: userData.name || `Artisan ${address.slice(0, 6)}`,
-          bio: userData.bio || "Digital Craftsman",
-          skills: userData.skills || []
-        };
-      } else {
-        // 用户不存在，创建新用户并保存到数据库
-        const newUserData = {
-          walletAddress: address,
-          did: did,
-          name: `Artisan ${address.slice(0, 6)}`,
-          bio: "Digital Craftsman",
-          skills: []
-        };
-        
-        const createResponse = await fetch('/api/users', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(newUserData)
-        });
-        
-        if (!createResponse.ok) {
-          throw new Error('Failed to create user in database');
-        }
-        
-        const savedUser = await createResponse.json();
-        userProfile = {
-          did: savedUser.did,
-          name: savedUser.name,
-          bio: savedUser.bio,
-          skills: savedUser.skills || []
-        };
-      }
-      
+    // Simulate wallet connection
+    setTimeout(() => {
       setLoading(false)
-      onLogin(userProfile)
-    } catch (err) {
-      setLoading(false)
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError("An error occurred while connecting to wallet.")
-      }
-    }
+      setStep("profile")
+    }, 1500)
   }
 
-  const handleCreateProfile = async (e: React.FormEvent) => {
+  const handleCreateProfile = (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
-    
-    try {
-      if (!window.ethereum) {
-        throw new Error("Wallet connection lost.")
-      }
-      
-      // 获取连接的钱包地址
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
-      const did = `did:whichwitch:${address}`
-      
-      // 保存用户资料到数据库
-      const userData = {
-        walletAddress: address,
-        did: did,
-        name: formData.name || `Artisan ${address.slice(0, 6)}`,
+    // Simulate profile creation on chain
+    setTimeout(() => {
+      setLoading(false)
+      onLogin({
+        did: "did:whichwitch:0x1234...5678",
+        name: formData.name || "Anonymous Artisan",
         bio: formData.bio || "Digital Craftsman",
-        skills: formData.skills
-      };
-      
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(userData)
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save user profile to database');
-      }
-      
-      const savedUser = await response.json();
-      const userProfile: UserProfile = {
-        did: savedUser.did,
-        name: savedUser.name,
-        bio: savedUser.bio,
-        skills: savedUser.skills || []
-      };
-      
-      setLoading(false)
-      onLogin(userProfile)
-    } catch (err) {
-      setLoading(false)
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError("An error occurred while creating profile.")
-      }
-    }
+        skills: formData.skills,
+      })
+    }, 1500)
   }
 
   const addSkill = (skill: string) => {
@@ -213,12 +84,6 @@ export function AuthView({ onLogin }: { onLogin: (user: UserProfile) => void }) 
         {step === "welcome" ? (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <div className="grid gap-4">
-              {error && (
-                <div className="flex items-center gap-2 text-destructive p-3 rounded-md bg-destructive/10">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{error}</span>
-                </div>
-              )}
               <Button
                 size="lg"
                 className="w-full h-14 text-lg font-medium relative overflow-hidden group"

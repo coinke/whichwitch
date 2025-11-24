@@ -84,9 +84,9 @@ export const works = [
     allowRemix: false,
     remixCount: 8,
     remixers: ["Peggy", "Rupert"],
-    collectionStatus: "rejected",
+    collectionStatus: "none",
     savedAt: "2024-09-05 16:00",
-    savedFolder: "To Remix",
+    savedFolder: "Research",
     createdAt: "2024-03-01",
   },
   {
@@ -193,8 +193,8 @@ export const works = [
     remixCount: 0,
     remixers: [],
     collectionStatus: "none",
-    savedAt: null,
-    savedFolder: null,
+    savedAt: "2024-10-12 09:30",
+    savedFolder: "Favorites",
     createdAt: "2024-05-05",
   },
   {
@@ -265,8 +265,8 @@ export const works = [
     remixCount: 0,
     remixers: [],
     collectionStatus: "none",
-    savedAt: null,
-    savedFolder: null,
+    savedAt: "2024-10-20 14:00",
+    savedFolder: "Inspiration",
     createdAt: "2024-05-25",
   },
   {

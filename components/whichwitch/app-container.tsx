@@ -26,6 +26,10 @@ export function WhichwitchApp() {
   const [works, setWorks] = useState(initialWorks)
   const [folders, setFolders] = useState(["Inspiration", "To Remix", "Favorites", "Research"])
 
+  const handleAddWork = (newWork: any) => {
+    setWorks((prev) => [{ ...newWork, id: Date.now() }, ...prev])
+  }
+
   const handleCollect = (workId: number, folderName: string) => {
     setWorks((prev) =>
       prev.map((w) => {
@@ -116,8 +120,7 @@ export function WhichwitchApp() {
 
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-xs font-mono text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
-            {/* 提取钱包地址并格式化显示 */}
-            {user.did.replace('did:whichwitch:', '').slice(0, 6)}...{user.did.replace('did:whichwitch:', '').slice(-4)}
+            {user.did.slice(0, 6)}...{user.did.slice(-4)}
           </div>
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-purple-600 border border-white/20" />
         </div>
@@ -136,7 +139,7 @@ export function WhichwitchApp() {
               className="h-full"
             >
               <TabsContent value="upload" className="mt-0 max-w-2xl mx-auto">
-                <UploadView user={user} works={works} />
+                <UploadView user={user} works={works} onAddWork={handleAddWork} />
               </TabsContent>
               <TabsContent value="square" className="mt-0">
                 <SquareView

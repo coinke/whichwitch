@@ -28,9 +28,9 @@ export function WorkCard({
   onClick,
   showSavedDate = false,
   onUnsave,
-  onCollect, // Added onCollect prop
-  folders = [], // Added folders prop
-  onCreateFolder, // Added onCreateFolder prop
+  onCollect,
+  folders = [],
+  onCreateFolder,
 }: {
   work: any
   isRemixable?: boolean
@@ -49,12 +49,37 @@ export function WorkCard({
   const [showTipModal, setShowTipModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [selectedRemixer, setSelectedRemixer] = useState(0)
 
-  // Determine if the work itself allows remixing
-  const canBeRemixed = work.allowRemix !== false
-
-  // If in a context where remix is possible (isRemixable=true), check if the work allows it
+  const canBeRemixed = work?.allowRemix !== false
   const isRemixActionAvailable = isRemixable && canBeRemixed
+
+  // Build genealogy with proper null checks
+  const genealogy = work?.allowRemix
+    ? [
+        {
+          id: "root",
+          title: work.title || "Untitled",
+          author: work.author || "Unknown",
+          date: work.createdAt || "2023-01-01",
+          type: "Original",
+          image: work.image || "/placeholder.svg",
+        },
+        ...(work.remixCount > 0 && Array.isArray(work.remixers) && work.remixers.length > 0
+          ? work.remixers.slice(0, 3).map((remixer: string, idx: number) => ({
+              id: `child${idx}`,
+              title: `Remix by ${remixer}`,
+              author: remixer,
+              date: new Date(
+                new Date(work.createdAt || Date.now()).getTime() + (idx + 1) * 30 * 24 * 60 * 60 * 1000,
+              ).toLocaleDateString(),
+              type: "Remix",
+              image: work.images?.[idx % work.images.length] || work.image || "/placeholder.svg",
+            }))
+          : []),
+      ]
+    : []
+  // </CHANGE>
 
   const handleCardClick = (e: any) => {
     // Prevent click when clicking buttons
@@ -156,14 +181,15 @@ export function WorkCard({
           </div>
 
           <div className="flex gap-2 flex-wrap">
-            {work.tags.map((tag: string) => (
-              <span
-                key={tag}
-                className="text-[10px] px-2 py-0.5 rounded bg-primary/5 border border-primary/10 text-primary/70 font-mono"
-              >
-                #{tag}
-              </span>
-            ))}
+            {Array.isArray(work?.tags) &&
+              work.tags.map((tag: string) => (
+                <span
+                  key={tag}
+                  className="text-[10px] px-2 py-0.5 rounded bg-primary/5 border border-primary/10 text-primary/70 font-mono"
+                >
+                  #{tag}
+                </span>
+              ))}
           </div>
 
           {showSavedDate && work.savedAt && (
@@ -304,7 +330,14 @@ export function WorkCard({
         }}
       />
       <TipModal open={showTipModal} onOpenChange={setShowTipModal} workTitle={work.title} />
-      <WorkDetailDialog work={work} open={showDetailsModal} onOpenChange={setShowDetailsModal} />
+      <WorkDetailDialog
+        work={work}
+        open={showDetailsModal}
+        onOpenChange={setShowDetailsModal}
+        selectedRemixer={selectedRemixer}
+        setSelectedRemixer={setSelectedRemixer}
+        genealogy={genealogy}
+      />
 
       {/* Quick Upload Modal for "Approved" state */}
       <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
@@ -540,44 +573,25 @@ function CollectModal({ open, onOpenChange, workTitle, folders = [], onCreateFol
   )
 }
 
-export function WorkDetailDialog({ work, open, onOpenChange }: any) {
+export function WorkDetailDialog({ work, open, onOpenChange, selectedRemixer, setSelectedRemixer, genealogy }: any) {
+  // Defensive check at the top of the component
   if (!work) return null
 
-  const genealogy = [
-    {
-      id: "root",
-      title: work.title, // Root is THIS work if it's an original
-      author: work.author,
-      date: work.createdAt || "2023-01-01",
-      type: "Original",
-      image: work.image,
-    },
-    // Mocking a child remix
-    ...(work.allowRemix && work.remixCount > 0
-      ? [
-          {
-            id: "child1",
-            title: "Remix #1",
-            author: work.remixers[0],
-            date: "2024-02-15",
-            type: "Remix",
-            image: "/abstract-geometric.png",
-          },
-        ]
-      : []),
-  ]
+  // Ensure safe access to arrays
+  const safeGenealogy = Array.isArray(genealogy) ? genealogy : []
+  const safeTags = Array.isArray(work.tags) ? work.tags : []
+  const safeRemixers = Array.isArray(work.remixers) ? work.remixers : []
+  const safeImages = Array.isArray(work.images) ? work.images : []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[90vw] h-[80vh] flex flex-col p-0 gap-0 bg-background/95 backdrop-blur-xl border-primary/20 overflow-hidden">
+      <DialogContent className="max-w-[60vw] h-[80vh] flex flex-col p-0 gap-0 bg-background/95 backdrop-blur-xl border-primary/20 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6 grid md:grid-cols-2 gap-8">
           {/* Left Column: Images */}
           <div className="space-y-4">
-            {/* ... Image gallery code ... */}
             <div className="aspect-square rounded-lg overflow-hidden border border-border/50 relative group">
-              <img src={work.image || "/placeholder.svg"} className="object-cover w-full h-full" />
+              <img src={work.image || "/placeholder.svg"} className="object-cover w-full h-full" alt={work.title} />
             </div>
-            {/* ... Thumbnails ... */}
           </div>
 
           {/* Right Column: Details */}
@@ -595,11 +609,17 @@ export function WorkDetailDialog({ work, open, onOpenChange }: any) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="block text-xs font-bold uppercase text-primary/70 mb-1">Material</span>
-                  {work.material}
+                  {work.material || "N/A"}
                 </div>
                 <div>
-                  <span className="block text-xs font-bold uppercase text-primary/70 mb-1">Dimensions</span>
-                  Variable (Digital)
+                  <span className="block text-xs font-bold uppercase text-primary/70 mb-1">Keywords</span>
+                  <div className="flex flex-wrap gap-1">
+                    {safeTags.map((tag: string) => (
+                      <span key={tag} className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -611,32 +631,84 @@ export function WorkDetailDialog({ work, open, onOpenChange }: any) {
               </h3>
 
               {!work.allowRemix ? (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
                   <Lock className="w-6 h-6 mx-auto mb-2 text-red-500" />
-                  <p className="text-sm font-medium text-red-500">Remixing disabled by creator</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-sm font-medium text-red-500 text-center">Remixing disabled by creator</p>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
                     This work cannot be used as a source for new creations.
                   </p>
                 </div>
               ) : (
-                <div className="relative pl-4 border-l-2 border-primary/20 space-y-6">
-                  {genealogy.map((node, i) => (
-                    <div key={node.id} className="relative">
-                      <div className="absolute -left-[21px] top-2 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
-                      <div className="flex items-start gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
-                        <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0">
-                          <img src={node.image || "/placeholder.svg"} className="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold uppercase text-primary mb-0.5">{node.type}</p>
-                          <p className="font-medium text-sm">{node.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            by {node.author} • {node.date}
-                          </p>
+                <div className="space-y-4">
+                  <div className="relative pl-4 border-l-2 border-primary/20 space-y-6">
+                    {safeGenealogy.map((node, i) => (
+                      <div key={node.id} className="relative">
+                        <div className="absolute -left-[21px] top-2 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="flex items-start gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                          <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0">
+                            <img
+                              src={node.image || "/placeholder.svg"}
+                              className="w-full h-full object-cover"
+                              alt={node.title}
+                            />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold uppercase text-primary mb-0.5">{node.type}</p>
+                            <p className="font-medium text-sm">{node.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              by {node.author} • {node.date}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                    ))}
+                  </div>
+
+                  {work.remixCount > 0 && (
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-bold mb-3">Remix Statistics</h4>
+                      <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/10">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Total remixes:</span>
+                          <span className="ml-2 font-bold text-primary">{work.remixCount}</span>
+                        </div>
+                      </div>
+                      {safeRemixers.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-bold uppercase text-muted-foreground mb-2">Remixed by</p>
+                          <div className="flex flex-wrap gap-2">
+                            {safeRemixers.map((remixer: string, idx: number) => (
+                              <button
+                                key={idx}
+                                onClick={() => setSelectedRemixer(idx)}
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                                  selectedRemixer === idx
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                {remixer}
+                              </button>
+                            ))}
+                          </div>
+                          {safeRemixers[selectedRemixer] && (
+                            <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                              <img
+                                src={
+                                  safeImages[selectedRemixer % Math.max(safeImages.length, 1)] ||
+                                  work.image ||
+                                  "/placeholder.svg"
+                                }
+                                className="w-full h-32 object-cover rounded mb-2"
+                                alt={`Remix by ${safeRemixers[selectedRemixer]}`}
+                              />
+                              <p className="text-xs font-medium">Remix by {safeRemixers[selectedRemixer]}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
