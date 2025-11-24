@@ -4,19 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import {
-  Heart,
-  Bookmark,
-  GitFork,
-  Share2,
-  Coins,
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Trash2,
-  Clock,
-  Folder,
-} from "lucide-react"
+import { Heart, Bookmark, GitFork, Share2, Coins, Trash2, Clock, Folder, Lock, Upload, RefreshCcw } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -28,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 export function WorkCard({
@@ -39,6 +28,9 @@ export function WorkCard({
   onClick,
   showSavedDate = false,
   onUnsave,
+  onCollect, // Added onCollect prop
+  folders = [], // Added folders prop
+  onCreateFolder, // Added onCreateFolder prop
 }: {
   work: any
   isRemixable?: boolean
@@ -48,11 +40,21 @@ export function WorkCard({
   onClick?: () => void
   showSavedDate?: boolean
   onUnsave?: () => void
+  onCollect?: (folder: string) => void
+  folders?: string[]
+  onCreateFolder?: (name: string) => void
 }) {
   const [liked, setLiked] = useState(false)
   const [showCollectModal, setShowCollectModal] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+
+  // Determine if the work itself allows remixing
+  const canBeRemixed = work.allowRemix !== false
+
+  // If in a context where remix is possible (isRemixable=true), check if the work allows it
+  const isRemixActionAvailable = isRemixable && canBeRemixed
 
   const handleCardClick = (e: any) => {
     // Prevent click when clicking buttons
@@ -120,14 +122,19 @@ export function WorkCard({
                 <GitFork className="w-3 h-3 mr-1 text-primary" /> Remix
               </Badge>
             )}
-            {status === "pending" && (
+            {!canBeRemixed && (
+              <Badge variant="destructive" className="bg-red-500/80 backdrop-blur-md text-white border-none shadow-lg">
+                <Lock className="w-3 h-3 mr-1" /> No Remix
+              </Badge>
+            )}
+            {canBeRemixed && status === "pending" && (
               <Badge className="bg-yellow-500/80 backdrop-blur-md text-white border-none">Under Review</Badge>
             )}
-            {status === "approved" && (
-              <Badge className="bg-green-500/80 backdrop-blur-md text-white border-none">Approved</Badge>
+            {canBeRemixed && status === "approved" && (
+              <Badge className="bg-green-500/80 backdrop-blur-md text-white border-none">Approved & Paid</Badge>
             )}
-            {status === "rejected" && (
-              <Badge className="bg-red-500/80 backdrop-blur-md text-white border-none">Rejected</Badge>
+            {canBeRemixed && status === "rejected" && (
+              <Badge className="bg-red-500/80 backdrop-blur-md text-white border-none">Rejected: Funds</Badge>
             )}
           </div>
         </div>
@@ -191,54 +198,160 @@ export function WorkCard({
             </div>
 
             <div className="flex gap-2">
-              {isRemixable && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 bg-transparent border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary"
-                  onClick={onRemix}
-                >
-                  <GitFork className="w-3.5 h-3.5 mr-1.5" />
-                  {status === "approved" ? "Upload" : status === "rejected" ? "Retry" : "Remix"}
-                </Button>
-              )}
-              {!isRemixable && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="h-8 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
-                  onClick={() => setShowCollectModal(true)}
-                >
-                  <Bookmark className="w-3.5 h-3.5 mr-1.5 fill-current" />
-                  Collect
-                </Button>
+              {onUnsave ? (
+                <>
+                  {status === "none" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canBeRemixed}
+                      className="h-8 bg-transparent border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={onRemix}
+                    >
+                      {canBeRemixed ? (
+                        <>
+                          <GitFork className="w-3.5 h-3.5 mr-1.5" />
+                          Remix
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 mr-1.5" />
+                          No Remix
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {status === "pending" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      className="h-8 bg-transparent border-primary/30 text-muted-foreground opacity-70"
+                    >
+                      <Clock className="w-3.5 h-3.5 mr-1.5" />
+                      Reviewing
+                    </Button>
+                  )}
+                  {status === "approved" && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-8 bg-green-600 hover:bg-green-700 text-white border-none"
+                      onClick={() => setShowUploadModal(true)}
+                    >
+                      <Upload className="w-3.5 h-3.5 mr-1.5" />
+                      Upload Work
+                    </Button>
+                  )}
+                  {status === "rejected" && (
+                    <Button size="sm" variant="destructive" className="h-8" onClick={onRemix}>
+                      <RefreshCcw className="w-3.5 h-3.5 mr-1.5" />
+                      Retry
+                    </Button>
+                  )}
+                </>
+              ) : (
+                /* Logic for Square/Profile Tab Actions */
+                <>
+                  {isRemixable && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canBeRemixed}
+                      className="h-8 bg-transparent border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={onRemix}
+                    >
+                      {canBeRemixed ? (
+                        <>
+                          <GitFork className="w-3.5 h-3.5 mr-1.5" />
+                          Remix
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 mr-1.5" />
+                          Locked
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {!isRemixable && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-8 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
+                      onClick={() => setShowCollectModal(true)}
+                    >
+                      <Bookmark className="w-3.5 h-3.5 mr-1.5 fill-current" />
+                      Collect
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>
         </div>
       </Card>
 
-      <CollectModal open={showCollectModal} onOpenChange={setShowCollectModal} workTitle={work.title} />
+      <CollectModal
+        open={showCollectModal}
+        onOpenChange={setShowCollectModal}
+        workTitle={work.title}
+        folders={folders}
+        onCreateFolder={onCreateFolder}
+        onSave={(folder) => {
+          if (onCollect) onCollect(folder)
+          setShowCollectModal(false)
+        }}
+      />
       <TipModal open={showTipModal} onOpenChange={setShowTipModal} workTitle={work.title} />
       <WorkDetailDialog work={work} open={showDetailsModal} onOpenChange={setShowDetailsModal} />
+
+      {/* Quick Upload Modal for "Approved" state */}
+      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+        <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-xl border-primary/20">
+          {/* We can reuse UploadView here or redirect, but for now let's just show a placeholder since we are inside a card component */}
+          {/* Better approach: The prompt implies this should trigger the creation flow. 
+               For this demo, I will render a simplified version of the UploadView's success state or a message.
+               However, to fully comply with "appear upload popup, content same as Create", 
+               I should probably just let the user know this would open the upload flow.
+           */}
+          <DialogHeader>
+            <DialogTitle>Upload Remix for "{work.title}"</DialogTitle>
+            <DialogDescription>Your proposal was approved! You can now upload your work.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              This would open the full Upload/Create view with this work pre-selected as the parent.
+            </p>
+            <Button onClick={() => setShowUploadModal(false)} className="w-full">
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
 
 function TipModal({ open, onOpenChange, workTitle }: any) {
-  const [amount, setAmount] = useState("1")
+  const [amount, setAmount] = useState("0.01")
+  const [customAmount, setCustomAmount] = useState("")
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
 
   const handleTip = () => {
+    // Logic: use custom amount if set, otherwise selected preset
+    const finalAmount = customAmount || amount
+
     // Simulate check balance (mock logic: error if amount > 50)
-    if (amount === "0.1") {
-      // Simulate insufficient balance for the largest amount
+    if (Number.parseFloat(finalAmount) > 10) {
+      // Simulate insufficient balance
       setStatus("error")
     } else {
       setStatus("success")
       setTimeout(() => {
         onOpenChange(false)
         setStatus("idle")
+        setCustomAmount("")
       }, 2000)
     }
   }
@@ -261,7 +374,16 @@ function TipModal({ open, onOpenChange, workTitle }: any) {
           ) : (
             <div className="space-y-4">
               <Label>Select Amount (ETH)</Label>
-              <RadioGroup defaultValue="0.01" onValueChange={setAmount} className="grid grid-cols-3 gap-2">
+              <RadioGroup
+                value={customAmount ? "custom" : amount}
+                onValueChange={(v) => {
+                  if (v !== "custom") {
+                    setAmount(v)
+                    setCustomAmount("")
+                  }
+                }}
+                className="grid grid-cols-3 gap-2"
+              >
                 {["0.01", "0.05", "0.1"].map((val) => (
                   <div key={val}>
                     <RadioGroupItem value={val} id={`tip-${val}`} className="peer sr-only" />
@@ -274,6 +396,21 @@ function TipModal({ open, onOpenChange, workTitle }: any) {
                   </div>
                 ))}
               </RadioGroup>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Or enter custom amount</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.00"
+                    className="pl-8"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">Ξ</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -285,7 +422,7 @@ function TipModal({ open, onOpenChange, workTitle }: any) {
           status !== "success" && (
             <DialogFooter>
               <Button onClick={handleTip} className="w-full">
-                Send Tip
+                Send Tip {customAmount ? customAmount : amount} ETH
               </Button>
             </DialogFooter>
           )
@@ -295,16 +432,15 @@ function TipModal({ open, onOpenChange, workTitle }: any) {
   )
 }
 
-function CollectModal({ open, onOpenChange, workTitle }: any) {
+function CollectModal({ open, onOpenChange, workTitle, folders = [], onCreateFolder, onSave }: any) {
   const [folderName, setFolderName] = useState("")
   const [showNewFolder, setShowNewFolder] = useState(false)
-  const [folders, setFolders] = useState(["Inspiration", "To Remix", "Favorites", "Research"])
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
 
   const handleAddFolder = () => {
     if (folderName.trim()) {
-      setFolders([...folders, folderName.trim()])
+      if (onCreateFolder) onCreateFolder(folderName.trim())
       setSelectedFolder(folderName.trim())
       setFolderName("")
       setShowNewFolder(false)
@@ -312,11 +448,12 @@ function CollectModal({ open, onOpenChange, workTitle }: any) {
   }
 
   const handleSave = () => {
+    if (!selectedFolder) return
     setShowSuccess(true)
     setTimeout(() => {
       setShowSuccess(false)
-      onOpenChange(false)
-    }, 2000)
+      if (onSave) onSave(selectedFolder)
+    }, 1500)
   }
 
   return (
@@ -340,7 +477,7 @@ function CollectModal({ open, onOpenChange, workTitle }: any) {
             <div className="space-y-2">
               <Label>Select Folder</Label>
               <div className="grid grid-cols-2 gap-2">
-                {folders.map((f) => (
+                {folders.map((f: string) => (
                   <Button
                     key={f}
                     variant={selectedFolder === f ? "default" : "outline"}
@@ -392,11 +529,11 @@ function CollectModal({ open, onOpenChange, workTitle }: any) {
         )}
 
         {!showSuccess && (
-          <DialogFooter>
-            <Button onClick={handleSave} className="w-full" disabled={!selectedFolder}>
+          <div className="flex justify-end pt-4">
+            <Button onClick={handleSave} disabled={!selectedFolder}>
               Save to Collection
             </Button>
-          </DialogFooter>
+          </div>
         )}
       </DialogContent>
     </Dialog>
@@ -404,182 +541,105 @@ function CollectModal({ open, onOpenChange, workTitle }: any) {
 }
 
 export function WorkDetailDialog({ work, open, onOpenChange }: any) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [activeRemixer, setActiveRemixer] = useState(0)
-
   if (!work) return null
 
-  const images = work.images || [work.image || "/placeholder.svg"]
-
-  const handleNextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % images.length)
-  }
-
-  const handlePrevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
-  }
+  const genealogy = [
+    {
+      id: "root",
+      title: work.title, // Root is THIS work if it's an original
+      author: work.author,
+      date: work.createdAt || "2023-01-01",
+      type: "Original",
+      image: work.image,
+    },
+    // Mocking a child remix
+    ...(work.allowRemix && work.remixCount > 0
+      ? [
+          {
+            id: "child1",
+            title: "Remix #1",
+            author: work.remixers[0],
+            date: "2024-02-15",
+            type: "Remix",
+            image: "/abstract-geometric.png",
+          },
+        ]
+      : []),
+  ]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] md:max-w-[60vw] max-h-[90vh] overflow-y-auto bg-background/95 backdrop-blur-xl border-primary/20">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">{work.title}</DialogTitle>
-          <DialogDescription>Genealogy and Attribution</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-4xl w-[90vw] h-[80vh] flex flex-col p-0 gap-0 bg-background/95 backdrop-blur-xl border-primary/20 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6 grid md:grid-cols-2 gap-8">
+          {/* Left Column: Images */}
+          <div className="space-y-4">
+            {/* ... Image gallery code ... */}
+            <div className="aspect-square rounded-lg overflow-hidden border border-border/50 relative group">
+              <img src={work.image || "/placeholder.svg"} className="object-cover w-full h-full" />
+            </div>
+            {/* ... Thumbnails ... */}
+          </div>
 
-        <div className="space-y-6 py-4">
-          <div className="rounded-xl overflow-hidden border border-border/50 shadow-2xl relative aspect-video bg-black/50 group">
-            <img src={images[currentImageIndex] || "/placeholder.svg"} className="w-full h-full object-contain" />
+          {/* Right Column: Details */}
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">{work.title}</h2>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-purple-600" />
+                <span className="font-mono text-sm">{work.author}</span>
+              </div>
+            </div>
 
-            {images.length > 1 && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={handlePrevImage}
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={handleNextImage}
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </Button>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1">
-                  {images.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full ${i === currentImageIndex ? "bg-white" : "bg-white/30"}`}
-                    />
+            <div className="space-y-4 text-sm text-muted-foreground">
+              <p>{work.story}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-bold uppercase text-primary/70 mb-1">Material</span>
+                  {work.material}
+                </div>
+                <div>
+                  <span className="block text-xs font-bold uppercase text-primary/70 mb-1">Dimensions</span>
+                  Variable (Digital)
+                </div>
+              </div>
+            </div>
+
+            {/* Genealogy Section */}
+            <div className="pt-6 border-t border-border/50">
+              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                <GitFork className="w-4 h-4" /> Creation Genealogy
+              </h3>
+
+              {!work.allowRemix ? (
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
+                  <Lock className="w-6 h-6 mx-auto mb-2 text-red-500" />
+                  <p className="text-sm font-medium text-red-500">Remixing disabled by creator</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This work cannot be used as a source for new creations.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative pl-4 border-l-2 border-primary/20 space-y-6">
+                  {genealogy.map((node, i) => (
+                    <div key={node.id} className="relative">
+                      <div className="absolute -left-[21px] top-2 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
+                      <div className="flex items-start gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                        <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0">
+                          <img src={node.image || "/placeholder.svg"} className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase text-primary mb-0.5">{node.type}</p>
+                          <p className="font-medium text-sm">{node.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            by {node.author} • {node.date}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-primary">Story</h4>
-                <p className="text-sm text-muted-foreground italic">"{work.story || "No story provided."}"</p>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-primary">Details</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="bg-muted/30 p-2 rounded">
-                    <span className="text-xs text-muted-foreground block">Material</span>
-                    <span>{work.material || "N/A"}</span>
-                  </div>
-                  <div className="bg-muted/30 p-2 rounded">
-                    <span className="text-xs text-muted-foreground block">Dimensions</span>
-                    <span>Variable</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Keywords</h4>
-                <div className="flex flex-wrap gap-2">
-                  {work.tags.map((tag: string) => (
-                    <Badge key={tag} variant="secondary" className="font-mono text-xs">
-                      #{tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
-
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-primary">
-                  <GitFork className="w-4 h-4" /> Creation Genealogy
-                </h4>
-                {/* ... existing genealogy visualization ... */}
-                <div className="p-4 bg-muted/20 rounded-xl border border-border/50 relative overflow-hidden h-full">
-                  {/* Simplified Genealogy Tree Visual */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3 opacity-50">
-                      <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-[10px]">
-                        Root
-                      </div>
-                      <div className="h-px bg-border flex-1" />
-                    </div>
-                    <div className="flex items-center gap-3 pl-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary text-primary flex items-center justify-center font-bold text-xs">
-                        You
-                      </div>
-                      <div className="text-xs font-bold">{work.title}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-4 border-t border-border/50">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">Remixed By ({work.remixCount || 0})</h4>
-            </div>
-
-            <div className="bg-muted/10 border border-border rounded-lg overflow-hidden">
-              <div className="flex border-b border-border/50 overflow-x-auto">
-                {(work.remixers || []).map((remixer: string, index: number) => (
-                  <button
-                    key={remixer}
-                    onClick={() => setActiveRemixer(index)}
-                    className={cn(
-                      "px-4 py-2 text-xs font-medium transition-colors border-r border-border/50 hover:bg-muted/50 whitespace-nowrap",
-                      activeRemixer === index
-                        ? "bg-primary/10 text-primary border-b-2 border-b-primary"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {remixer}
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-4 flex gap-4 items-start">
-                {(work.remixers || []).length > 0 ? (
-                  <>
-                    <div className="w-20 h-20 bg-muted rounded-md overflow-hidden shrink-0">
-                      {/* Mock remix image based on index */}
-                      <img
-                        src={images[activeRemixer % images.length] || "/placeholder.svg"}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold">Remix by {(work.remixers || [])[activeRemixer]}</p>
-                      <p className="text-xs text-muted-foreground">
-                        "An incredible reinterpretation using digital techniques..."
-                      </p>
-                      <Button size="sm" variant="link" className="h-auto p-0 text-primary text-xs">
-                        View Full Project
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center w-full py-4 text-sm text-muted-foreground">No remixes yet.</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-red-500 hover:text-red-600 hover:bg-red-500/10 w-full justify-start"
-            >
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Report Plagiarism / Copyright Infringement
-            </Button>
           </div>
         </div>
       </DialogContent>

@@ -10,6 +10,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Upload, Grid, Bookmark, User } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
+import { works as initialWorks } from "@/lib/mock-data"
 
 export type UserProfile = {
   did: string
@@ -21,6 +22,46 @@ export type UserProfile = {
 export function WhichwitchApp() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [activeTab, setActiveTab] = useState("square")
+
+  const [works, setWorks] = useState(initialWorks)
+  const [folders, setFolders] = useState(["Inspiration", "To Remix", "Favorites", "Research"])
+
+  const handleCollect = (workId: number, folderName: string) => {
+    setWorks((prev) =>
+      prev.map((w) => {
+        if (w.id === workId) {
+          return {
+            ...w,
+            savedAt: new Date().toLocaleString(),
+            savedFolder: folderName,
+          }
+        }
+        return w
+      }),
+    )
+  }
+
+  const handleUnsave = (workId: number) => {
+    setWorks((prev) =>
+      prev.map((w) => {
+        if (w.id === workId) {
+          return {
+            ...w,
+            savedAt: null,
+            savedFolder: null,
+            collectionStatus: "none",
+          }
+        }
+        return w
+      }),
+    )
+  }
+
+  const handleCreateFolder = (name: string) => {
+    if (!folders.includes(name)) {
+      setFolders((prev) => [...prev, name])
+    }
+  }
 
   if (!user) {
     return <AuthView onLogin={setUser} />
@@ -82,7 +123,7 @@ export function WhichwitchApp() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 pb-24 md:pb-12 pt-6">
+      <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 pb-24 md:pb-6 pt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <AnimatePresence mode="wait">
             <motion.div
@@ -94,16 +135,26 @@ export function WhichwitchApp() {
               className="h-full"
             >
               <TabsContent value="upload" className="mt-0 max-w-2xl mx-auto">
-                <UploadView user={user} />
+                <UploadView user={user} works={works} />
               </TabsContent>
               <TabsContent value="square" className="mt-0">
-                <SquareView />
+                <SquareView
+                  works={works}
+                  onCollect={handleCollect}
+                  folders={folders}
+                  onCreateFolder={handleCreateFolder}
+                />
               </TabsContent>
               <TabsContent value="collections" className="mt-0">
-                <CollectionsView />
+                <CollectionsView
+                  works={works}
+                  onUnsave={handleUnsave}
+                  folders={folders}
+                  onCreateFolder={handleCreateFolder}
+                />
               </TabsContent>
               <TabsContent value="profile" className="mt-0">
-                <ProfileView user={user} />
+                <ProfileView user={user} works={works} />
               </TabsContent>
             </motion.div>
           </AnimatePresence>

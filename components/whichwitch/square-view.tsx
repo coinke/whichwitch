@@ -2,12 +2,21 @@
 
 import { useState } from "react"
 import { WorkCard } from "./work-card"
-import { works } from "@/lib/mock-data"
 import { Input } from "@/components/ui/input"
 import { Search, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export function SquareView() {
+export function SquareView({
+  works,
+  onCollect,
+  folders,
+  onCreateFolder,
+}: {
+  works: any[]
+  onCollect: (id: number, folder: string) => void
+  folders: string[]
+  onCreateFolder: (name: string) => void
+}) {
   const [search, setSearch] = useState("")
 
   const COMMON_FILTERS = ["Digital", "Wood", "Clay", "Glass", "Cyberpunk", "Minimalist"]
@@ -70,7 +79,14 @@ export function SquareView() {
 
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredWorks.map((work) => (
-          <WorkCard key={work.id} work={work} allowTip={true} />
+          <WorkCard
+            key={work.id}
+            work={work}
+            allowTip={true}
+            onCollect={(folder) => onCollect(work.id, folder)}
+            folders={folders}
+            onCreateFolder={onCreateFolder}
+          />
         ))}
       </div>
     </div>

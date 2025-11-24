@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { WorkCard } from "./work-card"
-import { works } from "@/lib/mock-data"
 import {
   Dialog,
   DialogContent,
@@ -20,20 +19,36 @@ import { GitFork, Wallet, Folder } from "lucide-react"
 import { UploadView } from "./upload-view"
 import type { UserProfile } from "./app-container"
 
-export function CollectionsView() {
+export function CollectionsView({
+  works,
+  onUnsave,
+  folders,
+  onCreateFolder,
+}: {
+  works: any[]
+  onUnsave: (id: number) => void
+  folders: string[]
+  onCreateFolder: (name: string) => void
+}) {
   const [remixModalOpen, setRemixModalOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false)
   const [selectedWork, setSelectedWork] = useState<any>(null)
 
-  // Mocked collected works with statuses
-  const [collectedWorks, setCollectedWorks] = useState(
-    works.slice(0, 4).map((w, i) => ({
-      ...w,
-      collectionStatus: i === 3 ? "pending" : i === 2 ? "approved" : i === 1 ? "rejected" : "none",
-      savedAt: w.savedAt || "2024-01-01 12:00",
-    })),
-  )
+  const collectedWorks = works.filter((w) => w.savedAt)
+
+  // Group works by folder
+  const worksByFolder: Record<string, any[]> = {}
+  collectedWorks.forEach((w) => {
+    const folder = w.savedFolder || "Unsorted"
+    if (!worksByFolder[folder]) worksByFolder[folder] = []
+    worksByFolder[folder].push(w)
+  })
+
+  // Ensure all folders exist in the view even if empty
+  folders.forEach((f) => {
+    if (!worksByFolder[f]) worksByFolder[f] = []
+  })
 
   const handleRemixClick = (work: any) => {
     if (work.collectionStatus === "approved") {
@@ -42,15 +57,6 @@ export function CollectionsView() {
       setSelectedWork(work)
       setRemixModalOpen(true)
     }
-  }
-
-  const handleApplySuccess = () => {
-    setRemixModalOpen(false)
-    setCollectedWorks(collectedWorks.map((w) => (w.id === selectedWork.id ? { ...w, collectionStatus: "pending" } : w)))
-  }
-
-  const handleUnsave = (id: number) => {
-    setCollectedWorks(collectedWorks.filter((w) => w.id !== id))
   }
 
   return (
@@ -66,55 +72,113 @@ export function CollectionsView() {
         </Button>
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Folder className="w-4 h-4 text-primary" /> Inspiration
-          </h3>
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {collectedWorks.slice(0, 2).map((work) => (
-              <WorkCard
-                key={work.id}
-                work={work}
-                isRemixable={true}
-                status={work.collectionStatus as any}
-                onRemix={() => handleRemixClick(work)}
-                showSavedDate={true}
-                onUnsave={() => handleUnsave(work.id)}
-              />
-            ))}
+      <div className="space-y-10">
+        {Object.entries(worksByFolder).map(
+          ([folder, folderWorks]) =>
+            folderWorks.length > 0 && (
+              <div key={folder} className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Folder className="w-4 h-4 text-primary" /> {folder}
+                  <span className="text-xs text-muted-foreground font-normal ml-2">({folderWorks.length})</span>
+                </h3>
+                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {folderWorks.map((work) => (
+                    <WorkCard
+                      key={work.id}
+                      work={work}
+                      isRemixable={true}
+                      status={work.collectionStatus as any}
+                      onRemix={() => handleRemixClick(work)}
+                      showSavedDate={true}
+                      onUnsave={() => onUnsave(work.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ),
+        )}
+        {collectedWorks.length === 0 && (
+          <div className="text-center py-20 text-muted-foreground">
+            <p>No collections yet. Go to Square to discover and collect works!</p>
           </div>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Folder className="w-4 h-4 text-primary" /> To Remix
-          </h3>
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {collectedWorks.slice(2, 4).map((work) => (
-              <WorkCard
-                key={work.id}
-                work={work}
-                isRemixable={true}
-                status={work.collectionStatus as any}
-                onRemix={() => handleRemixClick(work)}
-                showSavedDate={true}
-                onUnsave={() => handleUnsave(work.id)}
-              />
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
-      <RemixApplicationModal
-        open={remixModalOpen}
-        onOpenChange={setRemixModalOpen}
-        work={selectedWork}
-        onSuccess={handleApplySuccess}
+      {/* Remix Application Modal */}
+      <Dialog open={remixModalOpen} onOpenChange={setRemixModalOpen}>
+        <DialogContent className="max-w-sm sm:max-w-md bg-background/95 backdrop-blur-xl border-primary/20">
+          <DialogHeader>
+            <DialogTitle>Apply for Remix License</DialogTitle>
+            <DialogDescription>Create a derivative work based on "{selectedWork?.title}".</DialogDescription>
+          </DialogHeader>
+
+          {selectedWork?.collectionStatus === "rejected" && (
+            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-md text-sm text-red-500">
+              Previous application rejected: Insufficient balance. Please top up and try again.
+            </div>
+          )}
+
+          <div className="space-y-6 py-4">
+            {/* Existing header */}
+            <div className="p-3 bg-muted/50 rounded-lg border border-border/50 flex items-center gap-3">
+              <div className="w-12 h-12 bg-background rounded-md overflow-hidden border border-border">
+                <img src={selectedWork?.image || "/placeholder.svg"} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">{selectedWork?.title}</p>
+                <p className="text-xs text-muted-foreground">Original by {selectedWork?.author}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Remix Type</Label>
+              <Select defaultValue="reprocess">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="reprocess">Reprocess (New Material)</SelectItem>
+                  <SelectItem value="remake">Remake (Visual Interpretation)</SelectItem>
+                  <SelectItem value="mix">Mix (Combined with other works)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <Label>License Fee</Label>
+              <div className="flex items-center gap-2 p-3 border border-border rounded-lg bg-muted/20">
+                <Wallet className="w-4 h-4 text-primary" />
+                <span className="text-sm font-mono">0.05 ETH</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              className="w-full bg-primary hover:bg-primary/90"
+              onClick={() => {
+                // For now, we'll keep local state for the modal
+                // Note: For a real app, setCollectedWorks/setStatus would need to update the parent state via a prop like onUpdateStatus
+                setRemixModalOpen(false)
+              }}
+            >
+              <GitFork className="w-4 h-4 mr-2" /> Pay & Mint License
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Folder Modal */}
+      <NewFolderModal
+        open={newFolderModalOpen}
+        onOpenChange={setNewFolderModalOpen}
+        onCreate={(name: string) => {
+          onCreateFolder(name)
+          setNewFolderModalOpen(false)
+        }}
       />
 
-      <NewFolderModal open={newFolderModalOpen} onOpenChange={setNewFolderModalOpen} />
-
+      {/* Upload Modal */}
       <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
         <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-xl border-primary/20 max-h-[90vh] overflow-y-auto">
           <UploadView user={{ did: "mock", name: "User", bio: "", skills: [] } as UserProfile} isRemix={true} />
@@ -124,7 +188,18 @@ export function CollectionsView() {
   )
 }
 
-function NewFolderModal({ open, onOpenChange }: any) {
+function NewFolderModal({ open, onOpenChange, onCreate }: any) {
+  const [name, setName] = useState("")
+  const [desc, setDesc] = useState("")
+
+  const handleCreate = () => {
+    if (name) {
+      if (onCreate) onCreate(name)
+      setName("")
+      setDesc("")
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm bg-background/95 backdrop-blur-xl border-primary/20">
@@ -134,91 +209,19 @@ function NewFolderModal({ open, onOpenChange }: any) {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Folder Name</Label>
-            <Input placeholder="e.g. Project Alpha" />
+            <Input placeholder="e.g. Project Alpha" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Description</Label>
-            <Textarea placeholder="What's this collection for?" />
+            <Textarea
+              placeholder="What's this collection for?"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Create Folder</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function RemixApplicationModal({ open, onOpenChange, work, onSuccess }: any) {
-  const [status, setStatus] = useState<"idle" | "error">("idle")
-
-  if (!work) return null
-
-  const handleApply = () => {
-    if (Math.random() > 0.8) {
-      setStatus("error")
-    } else {
-      onSuccess()
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm sm:max-w-md bg-background/95 backdrop-blur-xl border-primary/20">
-        <DialogHeader>
-          <DialogTitle>Apply for Remix License</DialogTitle>
-          <DialogDescription>Create a derivative work based on "{work.title}".</DialogDescription>
-        </DialogHeader>
-
-        {work.collectionStatus === "rejected" && (
-          <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-md text-sm text-red-500">
-            Previous application rejected: Insufficient balance. Please top up and try again.
-          </div>
-        )}
-
-        <div className="space-y-6 py-4">
-          {/* ... existing header ... */}
-          <div className="p-3 bg-muted/50 rounded-lg border border-border/50 flex items-center gap-3">
-            <div className="w-12 h-12 bg-background rounded-md overflow-hidden border border-border">
-              <img src={work.image || "/placeholder.svg"} className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">{work.title}</p>
-              <p className="text-xs text-muted-foreground">Original by {work.author}</p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Label>Remix Type</Label>
-            <Select defaultValue="reprocess">
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="reprocess">Reprocess (New Material)</SelectItem>
-                <SelectItem value="remake">Remake (Visual Interpretation)</SelectItem>
-                <SelectItem value="mix">Mix (Combined with other works)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-3">
-            <Label>License Fee</Label>
-            <div className="flex items-center gap-2 p-3 border border-border rounded-lg bg-muted/20">
-              <Wallet className="w-4 h-4 text-primary" />
-              <span className="text-sm font-mono">0.05 ETH</span>
-            </div>
-          </div>
-
-          {status === "error" && (
-            <p className="text-sm text-red-500 font-bold">Transaction failed: Insufficient funds.</p>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleApply}>
-            <GitFork className="w-4 h-4 mr-2" /> Pay & Mint License
-          </Button>
+          <Button onClick={handleCreate}>Create Folder</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

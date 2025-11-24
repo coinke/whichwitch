@@ -11,8 +11,12 @@ import { Textarea } from "@/components/ui/textarea"
 import type { UserProfile } from "./app-container"
 import { UploadCloud, CheckCircle2, X } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { works } from "@/lib/mock-data" // Importing mock works to simulate selection from saved approved works
 
 export function UploadView({ user, isRemix = false }: { user: UserProfile; isRemix?: boolean }) {
+  const [mode, setMode] = useState<"original" | "remix">("original")
+  const [selectedParentWork, setSelectedParentWork] = useState<number | null>(null)
+
   const [status, setStatus] = useState<"idle" | "uploading" | "success">("idle")
   const [file, setFile] = useState<File | null>(null)
   const [allowRemix, setAllowRemix] = useState(false)
@@ -23,6 +27,9 @@ export function UploadView({ user, isRemix = false }: { user: UserProfile; isRem
 
   const SUGGESTED_TAGS = ["Cyberpunk", "Minimalist", "Nature", "Abstract", "Surreal"]
   const SUGGESTED_MATERIALS = ["Digital", "Wood", "Clay", "Glass", "Metal"]
+
+  // Mock approved works for remix selection
+  const approvedWorks = works.filter((w) => w.allowRemix && w.collectionStatus === "approved")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,7 +61,7 @@ export function UploadView({ user, isRemix = false }: { user: UserProfile; isRem
           <CheckCircle2 className="w-10 h-10" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold">{isRemix ? "Remix Uploaded!" : "Work Minted Successfully!"}</h2>
+          <h2 className="text-2xl font-bold">{mode === "remix" ? "Remix Uploaded!" : "Work Minted Successfully!"}</h2>
           <p className="text-muted-foreground max-w-xs mx-auto">
             Your work has been recorded on the blockchain and added to the genealogy tree.
           </p>
@@ -69,10 +76,66 @@ export function UploadView({ user, isRemix = false }: { user: UserProfile; isRem
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold">{isRemix ? "Upload Remix" : "Upload Original Work"}</h2>
-        <p className="text-muted-foreground text-sm">Register your creation to the genealogy tree.</p>
+      <div className="space-y-4">
+        <div className="flex items-center p-1 bg-muted rounded-lg w-full">
+          <button
+            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === "original" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setMode("original")}
+          >
+            Original Work
+          </button>
+          <button
+            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === "remix" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setMode("remix")}
+          >
+            Remix Work
+          </button>
+        </div>
+
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold">{mode === "remix" ? "Upload Remix" : "Upload Original Work"}</h2>
+          <p className="text-muted-foreground text-sm">
+            {mode === "remix"
+              ? "Select an approved parent work and upload your derivative."
+              : "Register your creation to the genealogy tree."}
+          </p>
+        </div>
       </div>
+
+      {mode === "remix" && (
+        <div className="space-y-3 p-4 border rounded-xl bg-muted/20">
+          <Label>Select Parent Work</Label>
+          <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
+            {approvedWorks.length > 0 ? (
+              approvedWorks.map((work) => (
+                <div
+                  key={work.id}
+                  onClick={() => setSelectedParentWork(work.id)}
+                  className={`relative cursor-pointer group rounded-lg overflow-hidden border-2 transition-all ${selectedParentWork === work.id ? "border-primary ring-2 ring-primary/20" : "border-transparent hover:border-primary/50"}`}
+                >
+                  <div className="aspect-square bg-muted">
+                    <img src={work.image || "/placeholder.svg"} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="p-2 bg-background/90 text-xs font-medium truncate">{work.title}</div>
+                  {selectedParentWork === work.id && (
+                    <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="col-span-2 py-8 text-center text-muted-foreground text-sm">
+                No approved works found in your collection. <br />
+                Go to Saved tab to apply for remix rights.
+              </div>
+            )}
+          </div>
+          {approvedWorks.length > 0 && !selectedParentWork && (
+            <p className="text-xs text-red-500">Please select a parent work to proceed.</p>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* File Upload Area */}
@@ -214,8 +277,12 @@ export function UploadView({ user, isRemix = false }: { user: UserProfile; isRem
           )}
         </div>
 
-        <Button type="submit" className="w-full h-12 text-lg" disabled={!file || status === "uploading"}>
-          {status === "uploading" ? "Minting..." : isRemix ? "Mint Remix" : "Mint to Chain"}
+        <Button
+          type="submit"
+          className="w-full h-12 text-lg"
+          disabled={!file || status === "uploading" || (mode === "remix" && !selectedParentWork)}
+        >
+          {status === "uploading" ? "Minting..." : mode === "remix" ? "Mint Remix" : "Mint to Chain"}
         </Button>
       </form>
     </div>
